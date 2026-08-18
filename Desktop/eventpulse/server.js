@@ -1,12 +1,27 @@
 const http = require('http');
-const { Server } = require('socket.io');
+const express = require('express');
+const cors = require('cors');
 const dotenv = require('dotenv');
-const app = require('./app');
+const { Server } = require('socket.io');
+const swaggerUi = require('swagger-ui-express');
+
+const swaggerDocument = require('./swagger.json');
+const connectDB = require('./config/db');
 const Message = require('./models/Message');
 
-dotenv.config();
+const healthRoutes = require('./routes/healthRoutes');
+const authRoutes = require('./routes/authRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const registrationRoutes = require('./routes/registrationRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
+const errorMiddleware = require('./middleware/errorMiddleware');
 
+
+dotenv.config();
+connectDB()
+const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -15,6 +30,22 @@ const io = new Server(server, {
 });
 
 app.set('io', io);
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'success', message: 'EventPulse API is running' });
+});
+
+app.use('/health', healthRoutes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use('/api/auth', authRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api', announcementRoutes);
+
+app.use(errorMiddleware);
 
 io.on('connection', (socket) => {
   console.log(`[Socket.io] Client connected: ${socket.id}`);
@@ -38,12 +69,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// Run server listener locally only
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    console.log(`EventPulse Server running on port ${PORT}`);
-  });
-}
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`EventPulse Server running on port ${PORT}`);
+});
 
-module.exports = server;
+module.exports = app;
