@@ -1,12 +1,10 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db');
 const app = require('./app');
 const Message = require('./models/Message');
 
 dotenv.config();
-connectDB();
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -23,22 +21,15 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', (eventId) => {
     socket.join(eventId);
-    console.log(`[Socket.io] Client ${socket.id} joined room: ${eventId}`);
   });
 
   socket.on('send_announcement', async ({ eventId, senderId, content }) => {
     try {
-      const message = await Message.create({
-        event: eventId,
-        sender: senderId,
-        content
-      });
+      const message = await Message.create({ event: eventId, sender: senderId, content });
       const populatedMessage = await message.populate('sender', 'name role');
-
       io.to(eventId).emit('announcement', populatedMessage);
-      console.log(`[Socket.io] Broadcast announcement sent to event room: ${eventId}`);
     } catch (err) {
-      console.error('[Socket.io] Error broadcasting announcement:', err.message);
+      console.error('[Socket.io] Error:', err.message);
     }
   });
 
@@ -47,8 +38,9 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'test') {
+// Run server listener locally only
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
     console.log(`EventPulse Server running on port ${PORT}`);
   });
